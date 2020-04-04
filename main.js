@@ -129,12 +129,27 @@ async function makeAccount(event) {
 
 //loads a player from the database
 async function loadPlayer(event) {
+  let user = event.message.author.name;
+  let userhash = parseInt(simplifyNick(user), 36);
 
+  if (await hasAccount(user) == false) {
+    event.respond("Looks like you don't have an account, please make one before playing!");
+  }
+  else {
+
+  }
 }
 
 //saves a player to the database, also allows 
 //for updates on the player (keep track of stats).
 async function savePlayer(event, updates) {
+  let user = event.message.author.name;
+  let userhash = parseInt(simplifyNick(user), 36);
+
+  //flags to update information with
+  if(updates[0] == "") {
+    
+  }
 
 }
 
