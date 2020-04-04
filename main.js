@@ -22,10 +22,10 @@ let defaultBoard = [
   //1    2    3    4    5    6    7    8
   ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'], //h     R = rook
   ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'], //g     N = Knight
-  [], //f     B = Bishop
-  [], //e     Q = Queen
-  [], //d     K = King
-  [], //c     P = Pawn
+  [],                                       //f     B = Bishop
+  [],                                       //e     Q = Queen
+  [],                                       //d     K = King
+  [],                                       //c     P = Pawn
   ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'], //b
   ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r']  //a
 ];
@@ -48,6 +48,7 @@ bot({
       const words = event.message.content.split(' ');
       const operation = words[1] ? words[1].toLowerCase() : ''
       event.log.info(`operation is "${operation}"`)
+      console.log(event.message.author);
       processCommand(event, words);
     }
   }
@@ -64,8 +65,14 @@ async function processCommand(event, words) {
       break;
     case "move":
       break;
+    case "account":
+      account(event);
+      break;
     case "make":
       makeAccount(event);
+      break;
+    case "challenge":
+      challenge(event, words);
       break;
     default:
       event.respond("Incorrect Input, please try again or use help");
@@ -83,20 +90,23 @@ function simplifyNick(name) {
 
 //checks to see if a player has an account made or not
 async function hasAccount(user) {
-  var textByLine = fs.readFileSync("./database/accounts.txt").toString().split("\n");
-  let found = false;
+  if (user == null) {
+    return false;
+  }
+  else {
+    var textByLine = fs.readFileSync("./database/accounts.txt").toString().split("\n");
+    let found = false;
 
-  console.log(user + "/////");
+    textByLine.forEach(account => {
+      fields = account.split("/");
+      console.log(fields[1] + " vs " + user);
+      if (fields[1] == user.toString()) {
+        found = true;
+      }
+    });
 
-  textByLine.forEach(account => {
-    fields = account.split("/");
-    console.log(fields[1] + " vs " + user);
-    if(fields[1] == user.toString()) {
-      found = true;
-    }
-  });
-
-  return found;
+    return found;
+  }
 }
 
 //makes an account for a player. This is done by taking their nick
@@ -126,20 +136,37 @@ async function makeAccount(event) {
   }
 }
 
-
-//loads a player from the database
-async function loadPlayer(event) {
+//gives the player their account details
+async function account(event) {
   let user = event.message.author.name;
-  let userhash = parseInt(simplifyNick(user), 36);
-
-  if (await hasAccount(user) == false) {
-    event.respond("Looks like you don't have an account, please make one before playing!");
+  if(await hasAccount(user) == false) {
+    event.respond("Looks like you do not have an account yet.");
   }
   else {
 
   }
 }
 
+//creates a game between two player.
+async function challenge(event, words) {
+  let user = event.message.author.name;
+  let opponent = words[2];
+
+  if (await hasAccount(opponent) == false) {
+    event.respond("Looks like the person you challenged does not have an account.");
+  }
+  else if (opponent == user) {
+    event.respond("You cannot challenge yourself!");
+  }
+  //else {
+    //load default game, set the person who was challenged to be player 1
+    let turn = opponent;
+    let game = defaultBoard;
+
+    console.log(game);
+ // }
+
+}
 //saves a player to the database, also allows 
 //for updates on the player (keep track of stats).
 async function savePlayer(event, updates) {
@@ -147,8 +174,8 @@ async function savePlayer(event, updates) {
   let userhash = parseInt(simplifyNick(user), 36);
 
   //flags to update information with
-  if(updates[0] == "") {
-    
+  if (updates[0] == "") {
+
   }
 
 }
