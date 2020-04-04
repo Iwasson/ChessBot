@@ -139,7 +139,7 @@ async function makeAccount(event) {
 //gives the player their account details
 async function account(event) {
   let user = event.message.author.name;
-  if(await hasAccount(user) == false) {
+  if (await hasAccount(user) == false) {
     event.respond("Looks like you do not have an account yet.");
   }
   else {
@@ -159,12 +159,25 @@ async function challenge(event, words) {
     event.respond("You cannot challenge yourself!");
   }
   //else {
-    //load default game, set the person who was challenged to be player 1
-    let turn = opponent;
-    let game = defaultBoard;
+  //load default game, set the person who was challenged to be player 1
+  let turn = opponent;
+  let game = defaultBoard;
 
-    console.log(game);
- // }
+  var jsonData = JSON.stringify(defaultBoard);
+  fs.writeFile(user + "/" + opponent + ".txt", jsonData, function (err) {
+    if (err) {
+      console.log(err);
+    }
+  });
+  var jsonData = JSON.stringify(opponent);
+  fs.writeFile("./" + user + ":" + ".txt",{ flag: 'wx' }, jsonData, function (err) {
+    if (err) {
+      console.log(err);
+    }
+  });
+
+  console.log(game);
+  // }
 
 }
 //saves a player to the database, also allows 
