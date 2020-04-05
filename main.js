@@ -48,7 +48,6 @@ bot({
       const words = event.message.content.split(' ');
       const operation = words[1] ? words[1].toLowerCase() : ''
       event.log.info(`operation is "${operation}"`)
-      console.log(event.message.author);
       processCommand(event, words);
     }
   }
@@ -68,6 +67,9 @@ async function processCommand(event, words) {
     case "account":
       account(event);
       break;
+    case "display":
+      display(event, words);
+      break;
     case "make":
       makeAccount(event);
       break;
@@ -78,14 +80,6 @@ async function processCommand(event, words) {
       event.respond("Incorrect Input, please try again or use help");
       break;
   }
-}
-
-//strips all punctuation and spaces from nicknames
-function simplifyNick(name) {
-  name = name.replace(/\s+/g, '');
-  name = name.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
-
-  return name;
 }
 
 //checks to see if a player has an account made or not
@@ -99,8 +93,7 @@ async function hasAccount(user) {
 
     textByLine.forEach(account => {
       fields = account.split("/");
-      console.log(fields[1] + " vs " + user);
-      if (fields[1] == user.toString()) {
+      if (fields[0] == user.toString()) {
         found = true;
       }
     });
@@ -109,11 +102,27 @@ async function hasAccount(user) {
   }
 }
 
+async function hasGame(event, opponent) {
+  let user = event.message.author.name;
+  let found = false;
+
+  var accounts = fs.readFileSync("./database/accounts.txt").toString().split("\n");
+
+  accounts.forEach(account => {
+    if(account.startsWith(user)) {
+      if(account.includes(opponent)) {
+        found = true;
+      }
+    }
+  });
+
+  return found;
+}
+
 //makes an account for a player. This is done by taking their nick
 //off of rocket chat and creating a unique id for it.
 async function makeAccount(event) {
   let user = event.message.author.name;
-  let userhash = parseInt(simplifyNick(user), 36);
   let currentgameid = '';
 
   //if the user already has an account then we need to abort and 
@@ -126,7 +135,7 @@ async function makeAccount(event) {
     //uniqueid/rocketnick/currentgameid
     //gameid will be null at first until they challenge someone
 
-    let account = userhash.toString() + "/" + user.toString() + "/" + currentgameid.toString() + "\n";
+    let account = user.toString() + "/" + currentgameid.toString() + "\n";
 
     fs.appendFile("./database/accounts.txt", account, function (err) {
       if (err) throw err;
@@ -143,7 +152,27 @@ async function account(event) {
     event.respond("Looks like you do not have an account yet.");
   }
   else {
+    var accounts = fs.readFileSync("./database/accounts.txt").toString().split("\n");
 
+    accounts.forEach(account => {
+      fields = account.split("/");
+      if (fields[0] == user.toString()) {
+        let games = "";
+
+        if (fields.length > 2) {
+          for (var i = 1; i < fields.length; i += 1) {
+            games += i + ")" + fields[i] + "\n";
+          }
+        }
+        else {
+          games = "None! Come on, challenge someone!";
+        }
+
+        event.respond("Account summary: " +
+          "\nName: " + fields[0] +
+          "\nGames you are in: \n" + games);
+      }
+    });
   }
 }
 
@@ -152,45 +181,70 @@ async function challenge(event, words) {
   let user = event.message.author.name;
   let opponent = words[2];
 
+  //you need an account to challenge people
   if (await hasAccount(opponent) == false) {
     event.respond("Looks like the person you challenged does not have an account.");
   }
+  //cant challenge yourself to a game, thats bad
   else if (opponent == user) {
     event.respond("You cannot challenge yourself!");
   }
-  //else {
+  //cant challenge the same person twice, thats bad too
+  else if(await hasGame(event, opponent) == true) {
+    event.respond("You already have a game going with them!");
+  }
+  else {
   //load default game, set the person who was challenged to be player 1
   let turn = opponent;
   let game = defaultBoard;
 
-  var jsonData = JSON.stringify(defaultBoard);
-  fs.writeFile(user + "/" + opponent + ".txt", jsonData, function (err) {
-    if (err) {
-      console.log(err);
-    }
-  });
-  var jsonData = JSON.stringify(opponent);
-  fs.writeFile("./" + user + ":" + ".txt",{ flag: 'wx' }, jsonData, function (err) {
+  data = {game: game, turn: turn};
+
+  //var jsonData = JSON.stringify(defaultBoard);
+  var jsonData = JSON.stringify(data);
+  await fs.writeFile("./database/" + user + " vs " + opponent + ".txt", jsonData + "\n", function (err) {
     if (err) {
       console.log(err);
     }
   });
 
-  console.log(game);
-  // }
+  /*
+  var jsonData = JSON.stringify(user);
+
+  await fs.appendFile("./database/" + user + " vs " + opponent + ".txt", jsonData, function (err) {
+    if (err) {
+      console.log(err);
+    }
+  });
+*/
+  savePlayer(event, "append", user + " vs " + opponent);
+  }
 
 }
 //saves a player to the database, also allows 
 //for updates on the player (keep track of stats).
-async function savePlayer(event, updates) {
+async function savePlayer(event, flag, data) {
   let user = event.message.author.name;
-  let userhash = parseInt(simplifyNick(user), 36);
+  let pos = 0;
+  let index = 0;
+  var accounts = fs.readFileSync("./database/accounts.txt").toString().split("\n");
 
   //flags to update information with
-  if (updates[0] == "") {
-
+  //append means we add data to the end of the account. Such as adding new games to the list
+  if(flag == "append") {
+    accounts.forEach(account => {
+      if(account.startsWith(user)) {
+        index = pos;
+      }
+      pos += 1;
+    });
+    accounts[index] += data + "/";
+    await fs.writeFile("./database/accounts.txt", accounts.toString(), function (err) {
+      if (err) {
+        console.log(err);
+      }
+    });
   }
-
 }
 
 
@@ -199,9 +253,45 @@ async function saveGame(event, game) {
 
 }
 
+//displays the game
+async function display(event, words) {
+  let user = event.message.author.name;
+  let game = words[2];
+
+  if (game == null) {
+    event.respond("You need to specify which game you want to display.");
+  }
+  else {
+    let gameBoard = await loadGame(event, game);
+    event.respond("Turn: " + gameBoard.turn + "\n" + gameBoard.game.toString());
+  }
+}
+
 //this function will load the game for display and move validation 
 async function loadGame(event, game) {
+  var textByLine = fs.readFileSync("./database/accounts.txt").toString().split("\n");
+  let user = event.message.author.name;
+  let found = false;
+  let gameName = "";
 
+  textByLine.forEach(account => {
+    fields = account.split("/");
+    if (fields[0] == user.toString()) {
+      if (fields[game] != null) {
+        gameName = fields[game];
+        found = true;
+      }
+    }
+  });
+
+  if(found == false) {
+    event.respond("Specified game was not found!");
+  }
+  else {
+    let gameBoardData = fs.readFileSync("./database/" + gameName + ".txt");
+    let gameBoard = JSON.parse(gameBoardData);
+    return gameBoard;
+  }
 }
 
 //this will attempt to move a piece to a space
